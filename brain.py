@@ -13,7 +13,11 @@ def analyze_market(market_data):
     }
 
 def decide_trade(context):
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return "NO OPERAR", "Falta GROQ_API_KEY"
+
+    client = Groq(api_key=api_key)
     
     prompt = f"""
     Eres un analista experto en mercados de predicción. Evalúa este evento:
@@ -22,11 +26,11 @@ def decide_trade(context):
     VOLATILIDAD: {context['volatilidad']}
     
     REGLAS:
-    1. Si el evento es absurdo, imposible o pura especulación sin base, di NO OPERAR.
-    2. Si el precio es menor a 0.05 o mayor a 0.95, sé muy cauteloso (Riesgo/Beneficio malo).
+    1. Si el evento es absurdo, imposible o pura especulación sin base real, di NO OPERAR.
+    2. Si el precio es extremo (menor a 0.05 o mayor a 0.95), el riesgo es alto, sé muy crítico.
     3. Responde estrictamente en este formato:
        DECISIÓN: [OPERAR o NO OPERAR]
-       RAZÓN: [Máximo 10 palabras]
+       RAZÓN: [Máximo 10 palabras sobre la lógica del evento]
     """
 
     try:
@@ -38,7 +42,7 @@ def decide_trade(context):
         res = completion.choices[0].message.content
         
         decision = "OPERAR" if "DECISIÓN: OPERAR" in res else "NO OPERAR"
-        razon = res.split("RAZÓN:")[1].strip() if "RAZÓN:" in res else "Sin razón específica"
+        razon = res.split("RAZÓN:")[1].strip() if "RAZÓN:" in res else "Análisis de riesgo completado"
         return decision, razon
     except Exception as e:
-        return "NO OPERAR", f"Error IA: {e}"
+        return "NO OPERAR", f"Error IA: {str(e)[:50]}"

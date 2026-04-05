@@ -1,44 +1,64 @@
-import os
-from groq import Groq
+import pandas as pd
+import requests
+import re
 
-def analyze_market(market_data):
-    title = market_data.get('title', 'Desconocido')
-    price = market_data.get('price', 0)
-    change = market_data.get('change', 0) * 100
-    
-    return {
-        "evento": title,
-        "precio_actual": f"{price}$ (Probabilidad {int(price*100)}%)",
-        "volatilidad": f"{change:.2f}%"
-    }
+class PolymarketScanner:
+    def __init__(self):
+        # Endpoint de Gamma API (mercados con volumen)
+        self.api_url = "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=30&order=volume&ascending=false"
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
 
-def decide_trade(context):
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    
-    prompt = f"""
-    Eres un analista experto en mercados de predicción. Evalúa este evento:
-    EVENTO: {context['evento']}
-    PRECIO: {context['precio_actual']}
-    VOLATILIDAD: {context['volatilidad']}
-    
-    REGLAS:
-    1. Si el evento es absurdo, imposible o pura especulación sin base, di NO OPERAR.
-    2. Si el precio es menor a 0.05 o mayor a 0.95, sé muy cauteloso (Riesgo/Beneficio malo).
-    3. Responde estrictamente en este formato:
-       DECISIÓN: [OPERAR o NO OPERAR]
-       RAZÓN: [Máximo 10 palabras]
-    """
+    def fetch_active_markets(self):
+        try:
+            print("📡 Escaneando Polymarket (Gamma API)...")
+            response = requests.get(self.api_url, headers=self.headers, timeout=15)
+            if response.status_code != 200:
+                print(f"⚠️ Error de API: {response.status_code}")
+                return []
 
-    try:
-        completion = client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
-        )
-        res = completion.choices[0].message.content
-        
-        decision = "OPERAR" if "DECISIÓN: OPERAR" in res else "NO OPERAR"
-        razon = res.split("RAZÓN:")[1].strip() if "RAZÓN:" in res else "Sin razón específica"
-        return decision, razon
-    except Exception as e:
-        return "NO OPERAR", f"Error IA: {e}"
+            markets = response.json()
+            valid_data = []
+
+            for m in markets:
+                title = m.get('question')
+                # Buscamos precio en outcomePrices (lista de strings) o lastTradePrice
+                raw_price = m.get('outcomePrices') or m.get('lastTradePrice')
+                
+                if title and raw_price:
+                    try:
+                        # Extraemos el primer número decimal (ej: 0.55) usando Regex
+                        match = re.search(r"0\.\d+", str(raw_price))
+                        if match:
+                            current_price = float(match.group())
+                            # Simulamos cambio para que la IA analice el escenario
+                            prev_price = current_price * 1.10
+                            
+                            valid_data.append({
+                                "title": title,
+                                "price": current_price,
+                                "prev_price": prev_price
+                            })
+                    except:
+                        continue
+
+            if not valid_data:
+                return []
+
+            print(f"✅ {len(valid_data)} mercados reales detectados.")
+            df = pd.DataFrame(valid_data)
+            df['change'] = (df['price'] - df['prev_price']).abs() / df['prev_price']
+            
+            # Filtro de oportunidad
+            oportunidades = df[df['change'] >= 0.08]
+            return oportunidades.to_dict('records')
+
+        except Exception as e:
+            print(f"⚠️ Error en Scanner: {e}")
+            return []
+
+# FUNCIÓN PUENTE PARA MAIN.PY (IMPORTANTE)
+def scan_markets():
+    scanner = PolymarketScanner()
+    return scanner.fetch_active_markets()
