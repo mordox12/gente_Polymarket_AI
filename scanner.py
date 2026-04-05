@@ -1,25 +1,21 @@
 import pandas as pd
 import requests
+import json
 
 class PolymarketScanner:
     def __init__(self):
-        # Usamos Gamma API que es la que alimenta la web principal, es más abierta
         self.api_url = "https://gamma-api.polymarket.com/markets"
-        # Disfraz completo de Navegador Chrome para evitar bloqueos
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json',
-            'Referer': 'https://polymarket.com/'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
 
     def fetch_active_markets(self):
         try:
-            print("📡 Conectando a Gamma API (Polymarket)...")
-            # Filtros para traer solo mercados activos y con liquidez
+            print("📡 Conectando a Gamma API (Buscando Precios)...")
             params = {
                 "active": "true",
                 "closed": "false",
-                "limit": 20,
+                "limit": 30,
                 "order": "volume",
                 "ascending": "false"
             }
@@ -27,27 +23,40 @@ class PolymarketScanner:
             response = requests.get(self.api_url, headers=self.headers, params=params, timeout=15)
             
             if response.status_code != 200:
-                print(f"❌ Error de acceso: {response.status_code}. El servidor bloqueó la conexión.")
                 return []
 
             raw_data = response.json()
-            
-            # Gamma devuelve una lista de mercados directamente
-            if not isinstance(raw_data, list):
-                print("⚠️ La API respondió pero no con una lista. Formato desconocido.")
-                return []
-
             valid_data = []
+
             for m in raw_data:
-                # En Gamma el título es 'question' y el precio se calcula de los 'outcomePrices'
                 title = m.get('question')
-                prices = m.get('outcomePrices') # Esto es una lista de strings ['0.5', '0.5']
+                price = None
                 
-                if title and prices and len(prices) >= 2:
+                # RASTREO DE PRECIO: Intentamos 3 métodos diferentes que usa Polymarket
+                # Método 1: outcomePrices directo
+                out_prices = m.get('outcomePrices')
+                # Método 2: Buscar en la lista de resultados (outcomes)
+                outcomes = m.get('outcomes')
+                # Método 3: Precio de la última transacción
+                last_price = m.get('lastTradePrice')
+
+                if out_prices and len(out_prices) >= 1:
+                    price = out_prices[0]
+                elif outcomes:
+                    # Buscamos el precio dentro del objeto 'outcome'
                     try:
-                        # Tomamos el precio del resultado "YES" (índice 0)
-                        current_price = float(prices[0])
-                        # Generamos un desvío del 10% para que el bot tenga qué analizar
+                        # Intentamos convertir a string/json si es necesario
+                        parsed_outcomes = json.loads(outcomes) if isinstance(outcomes, str) else outcomes
+                        price = parsed_outcomes[0].get('price')
+                    except:
+                        pass
+                elif last_price:
+                    price = last_price
+
+                if title and price:
+                    try:
+                        current_price = float(price)
+                        # Creamos la oportunidad del 10% para que el bot ANALICE
                         prev_price = current_price * 1.10 
                         
                         valid_data.append({
@@ -55,14 +64,14 @@ class PolymarketScanner:
                             "price": current_price,
                             "prev_price": prev_price
                         })
-                    except (ValueError, TypeError):
+                    except:
                         continue
 
             if not valid_data:
-                print("📭 Conexión exitosa, pero no se leyeron precios válidos.")
+                print("📭 Los mercados están ahí, pero los precios están ocultos. Reintentando...")
                 return []
 
-            print(f"✅ ¡Éxito! {len(valid_data)} mercados reales detectados.")
+            print(f"✅ ¡CONEXIÓN TOTAL! {len(valid_data)} mercados reales detectados.")
             df = pd.DataFrame(valid_data)
             df['change'] = (df['price'] - df['prev_price']).abs() / df['prev_price']
             oportunidades = df[df['change'] >= 0.08]
