@@ -1,55 +1,40 @@
 import os
 from groq import Groq
 
-def analyze_market(market_data):
-    title = market_data.get('title', 'Desconocido')
-    price = market_data.get('price', 0)
-    change = market_data.get('change', 0) * 100
-    
-    return {
-        "evento": title,
-        "precio_actual": f"{price}$ (Probabilidad {int(price*100)}%)",
-        "volatilidad": f"{change:.2f}%"
-    }
-
-def decide_trade(context):
+def analyze_all_markets(markets_list):
+    """Envía todos los mercados en una sola ráfaga para evitar bloqueos y ahorrar tokens"""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        return "NO OPERAR", "Falta GROQ_API_KEY"
-
+        return "ERROR: Falta API Key"
+    
     client = Groq(api_key=api_key)
     
+    # Creamos un resumen de los 30 mercados para la IA
+    reporte = ""
+    for i, m in enumerate(markets_list):
+        # Limpiamos el título y precio para el prompt
+        titulo = m.get('title', 'Sin título')[:80] # Cortamos si es muy largo
+        precio = m.get('price', 0)
+        reporte += f"[{i}] {titulo} | Precio: {precio}$\n"
+
     prompt = f"""
-    Eres un analista experto en mercados de predicción. Evalúa este evento:
-    EVENTO: {context['evento']}
-    PRECIO: {context['precio_actual']}
-    VOLATILIDAD: {context['volatilidad']}
+    Eres un analista senior de trading. Analiza esta lista de mercados de Polymarket:
     
-    REGLAS:
-    1. Si el evento es absurdo, imposible o pura especulación sin base real, di NO OPERAR.
-    2. Si el precio es extremo (menor a 0.05 o mayor a 0.95), el riesgo es alto, sé muy crítico.
-    3. Responde estrictamente en este formato:
-       DECISIÓN: [OPERAR o NO OPERAR]
-       RAZÓN: [Máximo 10 palabras sobre la lógica del evento]
+    {reporte}
+    
+    TAREA:
+    1. Selecciona los 3 mercados con mejor lógica de inversión (evita temas absurdos o imposibles).
+    2. Para cada uno de los 3 seleccionados, responde estrictamente en este formato:
+       ID: [Número del índice] | RAZÓN: [Máximo 10 palabras]
     """
 
     try:
         completion = client.chat.completions.create(
-            # USAMOS EL MODELO ACTUALIZADO Y DISPONIBLE
-            model="llama-3.3-70b-versatile", 
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
+            temperature=0.2,
+            max_tokens=300
         )
-        res = completion.choices[0].message.content
-        
-        decision = "OPERAR" if "DECISIÓN: OPERAR" in res else "NO OPERAR"
-        
-        if "RAZÓN:" in res:
-            razon = res.split("RAZÓN:")[1].strip()
-        else:
-            razon = "Análisis completado satisfactoriamente"
-            
-        return decision, razon
+        return completion.choices[0].message.content
     except Exception as e:
-        print(f"❌ Error detallado de Groq: {e}")
-        return "NO OPERAR", "Reintentando con nuevo modelo..."
+        return f"ERROR: {str(e)}"
