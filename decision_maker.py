@@ -2,14 +2,11 @@ import os
 from dotenv import load_dotenv
 from groq import Groq
 
-# 1. Cargamos las variables del .env
 load_dotenv()
 
-# 2. DEFINIMOS LA CLASE (Esto es lo que te daba el error)
 class DecisionMaker:
     def __init__(self):
         api_key = os.getenv("GROQ_API_KEY")
-        # Inicializamos Groq
         self.client = Groq(api_key=api_key)
         print("🤖 Oráculo de IA (Groq) CONECTADO.")
 
@@ -25,14 +22,12 @@ class DecisionMaker:
         """
 
         try:
-            # Probamos con el modelo más estable actualmente en Groq
             response = self.client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model="llama-3.3-70b-specdec", 
             )
             return response.choices[0].message.content
-        except Exception as e:
-            # Plan de respaldo si el modelo anterior falla
+        except Exception:
             try:
                 response = self.client.chat.completions.create(
                     messages=[{"role": "user", "content": prompt}],
@@ -41,3 +36,17 @@ class DecisionMaker:
                 return response.choices[0].message.content
             except Exception as e_inner:
                 return f"❌ Error de conexión con la IA: {e_inner}"
+
+# --- ESTA ES LA FUNCIÓN "PUENTE" QUE TU MAIN NECESITA ---
+def decide_trade(analysis_text):
+    """
+    Esta función recibe el análisis (que en tu caso viene del brain) 
+    o los datos del mercado y decide.
+    """
+    dm = DecisionMaker()
+    # Si el análisis dice que hay oportunidad, devolvemos OPERAR
+    if "OPORTUNIDAD DETECTADA" in analysis_text:
+        # Extraemos un mensaje simple para el log
+        return "OPERAR", analysis_text
+    else:
+        return "ESPERAR", "No se detectó desvío suficiente."
