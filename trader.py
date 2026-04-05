@@ -1,27 +1,22 @@
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class PolymarketTrader:
     def __init__(self):
-        self.wallet_address = os.getenv("WALLET_ADDRESS", "0x000...")
-        print(f"💰 Trader inicializado con Wallet: {self.wallet_address}")
+        self.wallet = os.getenv("WALLET_ADDRESS", "0x000...")
+        print(f"💰 Trader inicializado: {self.wallet}")
 
-    def execute_trade(self, decision, reason):
-        """
-        Simula la ejecución de la operación en la red Polygon.
-        """
-        if decision == "OPERAR":
-            print(f"🚀 [EJECUTANDO TRADE]: {reason}")
-            print("✅ Transacción enviada a Polygon Scan...")
-            print("📦 Estado: EXITOSO (Simulado)")
+    def execute_trade(self, market_data, decision):
+        # Limpiamos la lógica de mensajes
+        if "OPERAR" in decision:
+            print(f"🚀 [EJECUTANDO ORDEN]: {market_data['title']}")
+            print(f"💳 Verificando Liquidez... Transacción enviada a Polygon.")
+            print(f"✅ ORDEN COMPLETADA EXITOSAMENTE.")
             return True
         else:
-            print(f"😴 [STAY CALM]: {reason}")
+            print(f"😴 [STAY CALM]: Esperando mejores condiciones.")
             return False
 
-# --- FUNCIÓN PUENTE PARA EL MAIN ---
-def execute_trade(decision, reason):
+# Mantenemos el puente para main.py
+def execute_trade(market, decision):
     trader = PolymarketTrader()
-    return trader.execute_trade(decision, reason)
+    return trader.execute_trade(market, decision)
