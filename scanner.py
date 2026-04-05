@@ -1,68 +1,44 @@
-import pandas as pd
-import requests
-import re
+import os
+from groq import Groq
 
-class PolymarketScanner:
-    def __init__(self):
-        # Usamos el endpoint de mercados con más volumen
-        self.api_url = "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=30&order=volume&ascending=false"
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+def analyze_market(market_data):
+    title = market_data.get('title', 'Desconocido')
+    price = market_data.get('price', 0)
+    change = market_data.get('change', 0) * 100
+    
+    return {
+        "evento": title,
+        "precio_actual": f"{price}$ (Probabilidad {int(price*100)}%)",
+        "volatilidad": f"{change:.2f}%"
+    }
 
-    def fetch_active_markets(self):
-        try:
-            print("📡 Intentando extracción profunda de precios...")
-            response = requests.get(self.api_url, headers=self.headers, timeout=15)
-            
-            if response.status_code != 200:
-                return []
+def decide_trade(context):
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    
+    prompt = f"""
+    Eres un analista experto en mercados de predicción. Evalúa este evento:
+    EVENTO: {context['evento']}
+    PRECIO: {context['precio_actual']}
+    VOLATILIDAD: {context['volatilidad']}
+    
+    REGLAS:
+    1. Si el evento es absurdo, imposible o pura especulación sin base, di NO OPERAR.
+    2. Si el precio es menor a 0.05 o mayor a 0.95, sé muy cauteloso (Riesgo/Beneficio malo).
+    3. Responde estrictamente en este formato:
+       DECISIÓN: [OPERAR o NO OPERAR]
+       RAZÓN: [Máximo 10 palabras]
+    """
 
-            markets = response.json()
-            valid_data = []
-
-            for m in markets:
-                title = m.get('question')
-                # Buscamos en todas las posibles ubicaciones del precio
-                raw_price = m.get('outcomePrices') or m.get('outcomes') or m.get('lastTradePrice')
-                
-                if title and raw_price:
-                    try:
-                        # LIMPIEZA TOTAL: Convertimos cualquier cosa a string y extraemos el primer número
-                        price_str = str(raw_price)
-                        # Usamos una expresión regular para encontrar el primer número decimal (ej: 0.55)
-                        match = re.search(r"0\.\d+", price_str)
-                        
-                        if match:
-                            current_price = float(match.group())
-                            
-                            # Simulamos el precio previo (10% de cambio) para activar la IA
-                            prev_price = current_price * 1.10
-                            
-                            valid_data.append({
-                                "title": title,
-                                "price": current_price,
-                                "prev_price": prev_price
-                            })
-                    except:
-                        continue
-
-            if not valid_data:
-                print("⚠️ Los servidores responden, pero los precios siguen encriptados. Reintentando...")
-                return []
-
-            print(f"✅ ¡CONEXIÓN ESTABLECIDA! {len(valid_data)} mercados reales detectados.")
-            df = pd.DataFrame(valid_data)
-            df['change'] = (df['price'] - df['prev_price']).abs() / df['prev_price']
-            
-            # Filtro del 8% para que el cerebro trabaje
-            oportunidades = df[df['change'] >= 0.08]
-            return oportunidades.to_dict('records')
-
-        except Exception as e:
-            print(f"⚠️ Error técnico en el scanner: {e}")
-            return []
-
-def scan_markets():
-    scanner = PolymarketScanner()
-    return scanner.fetch_active_markets()
+    try:
+        completion = client.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        res = completion.choices[0].message.content
+        
+        decision = "OPERAR" if "DECISIÓN: OPERAR" in res else "NO OPERAR"
+        razon = res.split("RAZÓN:")[1].strip() if "RAZÓN:" in res else "Sin razón específica"
+        return decision, razon
+    except Exception as e:
+        return "NO OPERAR", f"Error IA: {e}"
