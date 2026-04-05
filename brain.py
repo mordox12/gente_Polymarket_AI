@@ -1,40 +1,67 @@
 import os
+import requests
 from groq import Groq
 
 def analyze_all_markets(markets_list):
-    """Envía todos los mercados en una sola ráfaga para evitar bloqueos y ahorrar tokens"""
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        return "ERROR: Falta API Key"
-    
-    client = Groq(api_key=api_key)
-    
-    # Creamos un resumen de los 30 mercados para la IA
+    """
+    Cerebro Híbrido SENA v3.5: 
+    Intenta analizar con SambaNova. Si falla o hay límite, usa Groq como respaldo.
+    """
+    # Preparamos el reporte de mercados una sola vez
     reporte = ""
     for i, m in enumerate(markets_list):
-        # Limpiamos el título y precio para el prompt
-        titulo = m.get('title', 'Sin título')[:80] # Cortamos si es muy largo
+        titulo = m.get('title', 'Sin título')[:70]
         precio = m.get('price', 0)
         reporte += f"[{i}] {titulo} | Precio: {precio}$\n"
 
     prompt = f"""
-    Eres un analista senior de trading. Analiza esta lista de mercados de Polymarket:
-    
+    Eres un experto en mercados predictivos. Analiza estos 30 mercados de Polymarket:
     {reporte}
     
     TAREA:
-    1. Selecciona los 3 mercados con mejor lógica de inversión (evita temas absurdos o imposibles).
-    2. Para cada uno de los 3 seleccionados, responde estrictamente en este formato:
-       ID: [Número del índice] | RAZÓN: [Máximo 10 palabras]
+    1. Elige los 3 mercados con mejor lógica.
+    2. Responde estrictamente en este formato (una línea por cada uno):
+       ID: [número] | RAZÓN: [máximo 10 palabras]
     """
 
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=300
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        return f"ERROR: {str(e)}"
+    # --- INTENTO 1: SAMBANOVA (Plan A) ---
+    sn_key = os.getenv("SAMBANOVA_API_KEY")
+    if sn_key:
+        try:
+            url = "https://api.sambanova.ai/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {sn_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": "Llama-3.1-8B-Instruct",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1
+            }
+            response = requests.post(url, json=data, headers=headers, timeout=10)
+            if response.status_code == 200:
+                print("✨ [SambaNova]: Análisis exitoso.")
+                return response.json()['choices'][0]['message']['content']
+            else:
+                print(f"⚠️ SambaNova en límite o error ({response.status_code}). Saltando a Groq...")
+        except Exception as e:
+            print(f"⚠️ Error en SambaNova: {e}. Intentando respaldo...")
+
+    # --- INTENTO 2: GROQ (Plan B / Respaldo) ---
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
+        try:
+            client = Groq(api_key=groq_key)
+            completion = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1
+            )
+            print("⚡ [Groq]: Análisis de respaldo exitoso.")
+            return completion.choices[0].message.content
+        except Exception as e:
+            if "429" in str(e):
+                return "ERROR: Ambas APIs alcanzaron el límite diario."
+            return f"ERROR: Fallo total de APIs: {str(e)}"
+
+    return "ERROR: No se configuraron API Keys."
