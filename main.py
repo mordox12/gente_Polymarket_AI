@@ -68,4 +68,5 @@ def main():
         print(f"\n❌ ERROR CRÍTICO EN EL SISTEMA: {str(e)}")
         sys.exit(1)
 
-if __name__ == "__
+if __name__ == "__main__":
+    main()
