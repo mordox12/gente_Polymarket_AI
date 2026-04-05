@@ -1,58 +1,71 @@
 import time
-from scanner import PolymarketScanner
-from brain import TradingBrain
-from decision_maker import DecisionMaker
-from trader import AutonomousTrader
+import os
+import sys
+from scanner import scan_markets
+from brain import analyze_market
+from decision_maker import decide_trade
+from trader import PolymarketTrader
 
-def run_fully_autonomous_agent(trader_instance):
-    print("\n" + "="*60)
+def run_fully_autonomous_agent(trader):
+    """
+    Ejecuta un ciclo único de análisis y trading.
+    """
+    print("============================================================")
     print("🤖 EJECUTANDO CICLO DE TRADING AUTÓNOMO - ESTRATEGIA 'PAGA O MUERE'")
-    print("="*60)
+    print("============================================================")
     
-    # 1. Inicializamos herramientas del ciclo
-    scanner = PolymarketScanner()
-    brain = TradingBrain(threshold=0.08)
-    ai = DecisionMaker()
+    # 1. Escaneo de mercados (Real o Sintético según tu scanner.py)
+    print("🧠 Escaneando mercados en busca de ineficiencias...")
+    markets = scan_markets()
     
-    # 2. Escaneo de Oportunidades
-    raw_data = scanner.fetch_active_markets()
-    opportunities = brain.analyze_opportunities(raw_data)
-    
-    # 3. Decisiones y Ejecución
-    if not opportunities.empty:
-        print(f"\n🎯 {len(opportunities)} ineficiencias críticas detectadas.")
+    if not markets:
+        print("📭 No se encontraron oportunidades claras en este escaneo.")
+        return
+
+    # 2. Procesar los mercados detectados
+    for market in markets:
+        print(f"\n🔍 Analizando: {market['title']}...")
         
-        for _, row in opportunities.iterrows():
-            # Consultamos al Oráculo de IA
-            verdict = ai.evaluate_with_ai(row['question'], row['change'])
-            print(f"\n🧠 MERCADO: {row['question']}")
-            print(f"🤖 IA DICE: {verdict}")
+        # Consultar al oráculo de IA (Groq)
+        try:
+            analysis = analyze_market(market)
+            print(f"🤖 IA DICE: {analysis}")
             
-            # El brazo ejecutor toma la acción sobre la instancia del trader
-            trader_instance.execute_trade(row['question'], verdict)
-    else:
-        print("\n😴 El mercado está aburrido. No hay desvíos mayores al 8%.")
+            # 3. Tomar decisión basada en el análisis
+            action, reason = decide_trade(analysis)
+            
+            if action == "OPERAR":
+                print(f"💸 [EJECUCIÓN] Entrando en el mercado...")
+                trader.execute_trade(market)
+            else:
+                print(f"💤 [OMITIDO] La IA sugiere prudencia: {reason}")
+                
+        except Exception as e:
+            print(f"⚠️ Error procesando mercado '{market['title']}': {e}")
+            continue
 
-    print("\n" + "="*60)
-    print(f"📊 ESTADO ACTUAL DE BILLETERA: ${trader_instance.balance:.2f} USD")
-    print("="*60)
-
-if __name__ == "__main__":
-    # Creamos el Trader UNA SOLA VEZ para que mantenga el saldo entre ciclos
-    mi_trader = AutonomousTrader(balance_inicial=500.0)
+def main():
+    print("\n🚀 INICIANDO AGENTE EN LA NUBE (GitHub Actions)")
     
-    ciclo = 1
+    # Inicializar el Trader 
+    # (Asegúrate de que PolymarketTrader use os.getenv('GROQ_API_KEY'))
     try:
-        while True:
-            print(f"\n🔄 INICIANDO CICLO NÚMERO: {ciclo}")
-            run_fully_autonomous_agent(mi_trader)
-            
-            # Tiempo de espera para no quemar la API de Groq y parecer humano
-            espera = 300 # 5 minutos
-            print(f"\n⏳ Ciclo completado. 'Durmiendo' {espera/60} minutos para el siguiente escaneo...")
-            time.sleep(espera)
-            ciclo += 1
-            
-    except KeyboardInterrupt:
-        print("\n\n🛑 DETENCIÓN MANUAL DETECTADA. Guardando logs y cerrando sistema...")
-        print(f"💰 Saldo final en Wallet: ${mi_trader.balance:.2f} USD")
+        mi_trader = PolymarketTrader()
+        print(f"💰 Billetera conectada. Saldo actual: ${mi_trader.balance:.2f} USD")
+        
+        # EJECUCIÓN ÚNICA
+        run_fully_autonomous_agent(mi_trader)
+        
+        print("\n============================================================")
+        print(f"📊 ESTADO FINAL DE BILLETERA: ${mi_trader.balance:.2f} USD")
+        print("✅ CICLO COMPLETADO EXITOSAMENTE")
+        print("============================================================")
+        
+        # Salida limpia para que GitHub marque VERDE
+        sys.exit(0)
+        
+    except Exception as e:
+        print(f"\n❌ ERROR CRÍTICO EN EL SISTEMA: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__
