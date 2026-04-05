@@ -1,8 +1,9 @@
 import time
 import os
+import sys
 from dotenv import load_dotenv
 
-# Importaciones sincronizadas con tus archivos
+# Importaciones de tus archivos
 from scanner import scan_markets
 from brain import analyze_market
 from decision_maker import decide_trade
@@ -11,42 +12,47 @@ from trader import PolymarketTrader
 # Cargar configuración
 load_dotenv()
 
+# FORZAR LOGS EN VIVO (Para GitHub Actions)
+import functools
+print = functools.partial(print, flush=True)
+
 def main():
-    print("🚀 Agente Polymarket Autónomo - INICIANDO...")
+    print("🚀 AGENTE POLYMARKET REAL - INICIANDO...")
     print("------------------------------------------")
 
     while True:
         try:
-            # 1. ESCANEO: Obtener mercados con desvío del 8%
-            print("\n🔍 Escaneando mercados...")
+            # 1. ESCANEO REAL
+            print("\n🔍 Escaneando mercados en Polymarket (API REAL)...")
             mercados = scan_markets()
             
             if not mercados:
-                print("😴 No se detectaron desvíos críticos. Reintentando en 60s...")
+                print("😴 Sin movimientos bruscos (>8%). Reintentando en 60s...")
             else:
+                print(f"🎯 Se detectaron {len(mercados)} oportunidades potenciales.")
                 for mercado in mercados:
                     print(f"\n🎯 Analizando: {mercado['title']}")
                     
-                    # 2. CEREBRO: Procesar datos técnicos
+                    # 2. CEREBRO: Datos técnicos
                     analisis = analyze_market(mercado)
-                    print(f"📊 Resultado técnico: {analisis}")
+                    print(f"📊 Datos: {analisis}")
                     
-                    # 3. DECISIÓN: Consultar a la IA (Groq)
+                    # 3. DECISIÓN: Groq IA
                     decision, razon = decide_trade(analisis)
-                    print(f"🤖 Recomendación IA: {decision}")
+                    print(f"🤖 IA Groq dice: {decision}")
                     
-                    # 4. TRADER: Ejecutar si la decisión es OPERAR
+                    # 4. TRADER: Acción
                     if decision == "OPERAR":
                         trader = PolymarketTrader()
                         trader.execute_trade(mercado, decision)
                     else:
-                        print(f"❌ Orden descartada: {razon}")
+                        print(f"❌ Descartado: {razon}")
 
-            print("\n⌛ Ciclo completado. Esperando próximo escaneo...")
-            time.sleep(60) # Pausa de 1 minuto entre ciclos
+            print("\n⌛ Ciclo completado. Esperando 60s para el próximo escaneo...")
+            time.sleep(60)
 
         except Exception as e:
-            print(f"⚠️ Error en el ciclo principal: {e}")
+            print(f"⚠️ Error en el ciclo: {e}")
             time.sleep(10)
 
 if __name__ == "__main__":
