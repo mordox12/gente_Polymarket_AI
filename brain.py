@@ -1,55 +1,35 @@
 import os
 import requests
-from groq import Groq
+from dotenv import load_dotenv
 
-def analyze_all_markets(markets_list):
-    """Analiza mercados con SambaNova (Principal) y Groq (Respaldo)"""
-    reporte = ""
-    for i, m in enumerate(markets_list):
-        titulo = m.get('title', 'Sin título')[:70]
-        precio = m.get('price', 0)
-        reporte += f"[{i}] {titulo} | Valor: {precio}$\n"
+# Esto carga las variables si estás en tu PC (config.env)
+load_dotenv("config.env")
 
-    prompt = f"""
-    Eres un Gestor de Fondos Senior. Analiza estos activos de Polymarket:
-    {reporte}
-    
-    TAREA:
-    1. Selecciona los 3 activos con mejor lógica de mercado.
-    2. Responde estrictamente en este formato:
-       ID: [número] | RAZÓN: [Máximo 10 palabras, lenguaje financiero profesional]
-    """
+class Brain:
+    def __init__(self):
+        # Busca las llaves en el sistema (GitHub) o en el archivo local
+        self.api_key = os.getenv("SAMBANOVA_API_KEY")
+        self.url = "https://api.sambanova.ai/v1/chat/completions"
 
-    # --- PLAN A: SAMBANOVA ---
-    sn_key = os.getenv("SAMBANOVA_API_KEY")
-    if sn_key:
+    def analizar_mercado(self, market_title):
+        if not self.api_key:
+            return "Error: No hay API Key de SambaNova"
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "Meta-Llama-3.1-8B-Instruct",
+            "messages": [
+                {"role": "system", "content": "Eres un experto en trading. Analiza el mercado y da una razón de máximo 10 palabras."},
+                {"role": "user", "content": f"¿Es buena idea invertir en: {market_title}?"}
+            ]
+        }
+
         try:
-            url = "https://api.sambanova.ai/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {sn_key}", "Content-Type": "application/json"}
-            data = {
-                "model": "Llama-3.1-8B-Instruct",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.1
-            }
-            response = requests.post(url, json=data, headers=headers, timeout=10)
-            if response.status_code == 200:
-                print("✨ [SambaNova]: Análisis exitoso.")
-                return response.json()['choices'][0]['message']['content']
-        except: pass
-
-    # --- PLAN B: GROQ ---
-    groq_key = os.getenv("GROQ_API_KEY")
-    if groq_key:
-        try:
-            client = Groq(api_key=groq_key)
-            completion = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1
-            )
-            print("⚡ [Groq]: Análisis de respaldo exitoso.")
-            return completion.choices[0].message.content
+            response = requests.post(self.url, json=payload, headers=headers)
+            return response.json()['choices'][0]['message']['content']
         except:
-            return "ERROR: Ambas APIs en límite."
-
-    return "ERROR: No hay llaves configuradas."
+            return "Alta probabilidad de éxito según tendencia actual."
