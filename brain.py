@@ -35,14 +35,23 @@ def decide_trade(context):
 
     try:
         completion = client.chat.completions.create(
-            model="llama3-70b-8192",
+            # CAMBIAMOS A ESTE MODELO QUE ES MÁS ESTABLE PARA CUENTAS FREE
+            model="llama3-8b-8192", 
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1
         )
         res = completion.choices[0].message.content
         
         decision = "OPERAR" if "DECISIÓN: OPERAR" in res else "NO OPERAR"
-        razon = res.split("RAZÓN:")[1].strip() if "RAZÓN:" in res else "Análisis de riesgo completado"
+        
+        # Limpieza de la razón para que no se rompa el log
+        if "RAZÓN:" in res:
+            razon = res.split("RAZÓN:")[1].strip()
+        else:
+            razon = "Análisis de riesgo completado"
+            
         return decision, razon
     except Exception as e:
-        return "NO OPERAR", f"Error IA: {str(e)[:50]}"
+        # Imprimimos el error real en la consola para saber qué pasa si falla de nuevo
+        print(f"❌ Error detallado de Groq: {e}")
+        return "NO OPERAR", "Error de respuesta IA"
