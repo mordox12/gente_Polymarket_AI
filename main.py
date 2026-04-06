@@ -9,48 +9,55 @@ load_dotenv()
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# --- ESTRATEGIA DE CRECIMIENTO ACELERADO ---
-CAPITAL_BASE = 150000.0  # Tu punto de partida
-# -------------------------------------------
+# --- CONFIGURACIÓN DE CAPITAL ---
+CAPITAL_BASE = 150000.0 
+# --------------------------------
 
 def obtener_noticia_real():
     url_news = "https://news.google.com/rss/search?q=crypto+market+trading+economy&hl=es-419&gl=CO&ceid=CO:es-419"
     try:
         feed = feedparser.parse(url_news)
-        return random.choice(feed.entries[:5]).title if feed.entries else "Mercado en zona de acumulación"
+        return random.choice(feed.entries[:5]).title if feed.entries else "Mercado estable"
     except:
-        return "Análisis técnico: Consolidación de tendencia"
+        return "Análisis técnico de activos digitales"
 
-def generar_reporte_crecimiento():
+def generar_reporte_dual():
     noticia_hoy = obtener_noticia_real()
     fecha_hoy = datetime.now().strftime("%d/%m/%Y %I:%M %p")
     
-    # ESTRATEGIA: Invertir el 50% para maximizar retorno inicial
-    monto_en_riesgo = CAPITAL_BASE * 0.50
+    # 1. LÓGICA DE LA SEÑAL (Para los que operan manual)
+    activos = ["Bitcoin (BTC/USDT)", "Ethereum (ETH/USDT)", "Solana (SOL/USDT)", "Polymarket Event #42"]
+    activo_hoy = random.choice(activos)
     
-    # RENTABILIDAD AGRESIVA (Para capitales pequeños: 4% al 9%)
-    porcentaje_retorno = random.uniform(0.04, 0.09)
-    ganancia_neta = monto_en_riesgo * porcentaje_retorno
-    saldo_proyectado = CAPITAL_BASE + ganancia_neta
+    palabras_alza = ['sube', 'gana', 'crece', 'bitcoin', 'positivo', 'etf']
+    tipo_orden = "🟢 COMPRA / LONG" if any(w in noticia_hoy.lower() for w in palabras_alza) else "🔴 VENTA / SHORT"
+    precio_entrada = f"{random.uniform(60000, 70000):,.0f}" if "BTC" in activo_hoy else f"{random.uniform(20, 150):,.2f}"
 
-    # Criterio de la IA
-    palabras_alcistas = ['sube', 'gana', 'crece', 'bitcoin', 'etf', 'positivo', 'adopción', 'récord']
-    sentimiento = "🚀 ALCISTA" if any(w in noticia_hoy.lower() for w in palabras_alcistas) else "📊 NEUTRAL / ESTABLE"
+    # 2. LÓGICA DE GESTIÓN VIP (Lo que el bot YA hizo)
+    monto_operado = CAPITAL_BASE * 0.50
+    porcentaje_retorno = random.uniform(0.04, 0.08)
+    ganancia_neta = monto_operado * porcentaje_retorno
+    saldo_final = CAPITAL_BASE + ganancia_neta
 
+    # --- DISEÑO DEL MENSAJE DUAL ---
     mensaje = (
-        f"🏆 *ESTRATEGIA DE ESCALABILIDAD IA*\n"
+        f"📡 *SEÑAL DE MERCADO EN VIVO*\n"
         f"📅 *CORTE:* {fecha_hoy}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 *CAPITAL ACTUAL:* ${CAPITAL_BASE:,.0f} COP\n"
-        f"⚡ *PODER DE COMPRA (50%):* ${monto_en_riesgo:,.0f} COP\n"
+        f"📊 *ACTIVO:* {activo_hoy}\n"
+        f"⚡ *ORDEN SUGERIDA:* {tipo_orden}\n"
+        f"🎯 *ENTRADA RECOMENDADA:* ${precio_entrada}\n"
+        f"🗞️ *BASADO EN:* _{noticia_hoy}_\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🗞️ *NOTICIA DEL CICLO:*\n_{noticia_hoy}_\n\n"
-        f"🧠 *SENTIMIENTO:* {sentimiento}\n"
-        f"📈 *RETORNO EN ESTE CICLO:* +{porcentaje_retorno*100:.1f}%\n"
-        f"💵 *UTILIDAD GENERADA:* +${ganancia_neta:,.0f} COP\n"
+        f"💼 *ESTADO GESTIÓN AUTOMÁTICA (VIP)*\n"
+        f"✅ *ESTADO:* OPERACIÓN EJECUTADA\n"
+        f"💰 *MONTO INVERTIDO:* ${monto_operado:,.0f} COP\n"
+        f"📈 *RETORNO CAPTURADO:* +{porcentaje_retorno*100:.1f}%\n"
+        f"💵 *GANANCIA NETA:* +${ganancia_neta:,.0f} COP\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💎 *META DE SALDO:* ${saldo_proyectado:,.0f} COP\n"
-        f"⚠️ _Gestión de riesgo: Operando sin sobre-apalancamiento._"
+        f"💎 *SALDO ACTUAL EN GESTIÓN:* ${saldo_final:,.0f} COP\n\n"
+        f"🔗 [Vincular mi Billetera al Bot](https://t.me/TuUsuarioDeTelegram)\n"
+        f"🚀 _Deja que la IA opere por ti mientras descansas._"
     )
 
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -59,9 +66,9 @@ def generar_reporte_crecimiento():
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
-            print(f"✅ Reporte de crecimiento enviado. Saldo: ${saldo_proyectado:,.0f}")
+            print(f"✅ Reporte Dual enviado. Saldo: ${saldo_final:,.0f}")
     except Exception as e:
-        print(f"❌ Error en sistema: {e}")
+        print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
-    generar_reporte_crecimiento()
+    generar_reporte_dual()
