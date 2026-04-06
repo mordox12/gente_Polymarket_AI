@@ -1,11 +1,11 @@
-name: Agente IA Polymarket Ejecutor
+name: Agente IA Polymarket Ejecutivo
 
 on:
   push:
     branches: [ main ]
   schedule:
-    - cron: '*/10 * * * *'  # <-- CAMBIADO A 10 MINUTOS
-  workflow_dispatch:        # Para que puedas darle "Run" manual si quieres
+    - cron: '0 * * * *'  # Ejecución programada cada hora exacta
+  workflow_dispatch:     # Permite ejecución manual para demostraciones
 
 jobs:
   ejecutar-agente:
@@ -19,11 +19,12 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Instalar Librerías Necesarias
-        run: pip install requests python-dotenv
+      - name: Instalar Librerías Profesionales
+        run: pip install requests python-dotenv feedparser
 
-      - name: Correr el Agente IA
+      - name: Correr el Agente de Inteligencia
         env:
+          # Asegúrate de que estos nombres coincidan con tus Secrets en GitHub
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
