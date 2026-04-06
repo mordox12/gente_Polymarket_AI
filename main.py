@@ -56,7 +56,7 @@ def generar_reporte_dual():
         f"💵 *GANANCIA NETA:* +${ganancia_neta:,.0f} COP\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💎 *SALDO ACTUAL EN GESTIÓN:* ${saldo_final:,.0f} COP\n\n"
-       f"🔗 [Vincular mi Billetera al Bot](https://t.me/@CoDisoloCoDi)\n"
+       f"🔗 [Vincular mi Billetera al Bot](https://t.me/Mordox12)\n"
         f"🚀 _Deja que la IA opere por ti mientras descansas._"
     )
 
