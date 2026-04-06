@@ -56,12 +56,17 @@ def generar_reporte_dual():
         f"💵 *GANANCIA NETA:* +${ganancia_neta:,.0f} COP\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💎 *SALDO ACTUAL EN GESTIÓN:* ${saldo_final:,.0f} COP\n\n"
-        f"🔗 [Vincular mi Billetera al Bot](https://t.me/TuUsuarioDeTelegram)\n"
+       f"🔗 [Vincular mi Billetera al Bot](https://t.me/@CoDisoloCoDi)\n"
         f"🚀 _Deja que la IA opere por ti mientras descansas._"
     )
 
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {'chat_id': CHAT_ID, 'text': mensaje, 'parse_mode': 'Markdown'}
+    payload = {
+        'chat_id': CHAT_ID, 
+        'text': mensaje, 
+        'parse_mode': 'Markdown',
+        'disable_web_page_preview': True
+    }
     
     try:
         response = requests.post(url, json=payload)
