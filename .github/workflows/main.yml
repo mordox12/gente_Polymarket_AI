@@ -1,13 +1,29 @@
-name: EXEC_REAL
+name: POLYBOT_SYNC_REAL
+
 on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '*/10 * * * *'
   workflow_dispatch:
+
 jobs:
-  run:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: pip install requests
-      - env:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Instalar Requests
+        run: pip install requests
+
+      - name: Ejecutar Bot Real
+        env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           ID_DE_CHAT_DE_TELEGRAM: ${{ secrets.ID_DE_CHAT_DE_TELEGRAM }}
           BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
