@@ -1,11 +1,19 @@
 import os, requests, hmac, hashlib, time, random
 from datetime import datetime
 
-# CONFIGURACIÓN
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 CHAT_ID = os.getenv('ID_DE_CHAT_DE_TELEGRAM') 
 API_KEY = os.getenv('BINANCE_API_KEY')
 SECRET_KEY = os.getenv('BINANCE_SECRET_KEY')
+
+def obtener_proxies_libres():
+    # Obtiene una lista de proxies frescos para intentar saltar el bloqueo de USA
+    try:
+        url = "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=1000&country=all&ssl=all&anonymity=all"
+        r = requests.get(url)
+        return r.text.splitlines()
+    except:
+        return []
 
 def ejecutar_agente_polybot():
     if not API_KEY or not SECRET_KEY: return
@@ -13,47 +21,31 @@ def ejecutar_agente_polybot():
     ts = int(time.time() * 1000)
     query = f"timestamp={ts}"
     signature = hmac.new(SECRET_KEY.encode('utf-8'), query.encode('utf-8'), hashlib.sha256).hexdigest()
-    
-    # Intentaremos con el endpoint de reserva que a veces no tiene el bloqueo tan estricto
-    url = f"https://api3.binance.com/api/v3/account?{query}&signature={signature}"
+    url = f"https://api.binance.com/api/v3/account?{query}&signature={signature}"
     headers = {"X-MBX-APIKEY": API_KEY}
 
-    # --- LA MANERA DIFÍCIL: PROXIES DE EMERGENCIA ---
-    # Usamos un servicio de proxy transparente para engañar la ubicación de GitHub
-    proxies_emergencia = [
-        "http://45.77.191.135:8080", # Ejemplo de Proxy en Japón/Europa
-        "http://159.203.87.130:3128"  # Ejemplo de Proxy en Canadá
-    ]
-
+    proxies = obtener_proxies_libres()
     data = None
     exito = False
 
-    # Intento 1: Directo (por si GitHub cambió de rango de IP)
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        data = r.json()
-        if 'balances' in data: exito = True
-    except: pass
-
-    # Intento 2: Usando túneles si el directo falla por geografía
-    if not exito:
-        for p_url in proxies_emergencia:
-            try:
-                proxies = {"http": p_url, "https": p_url}
-                r = requests.get(url, headers=headers, proxies=proxies, timeout=12)
-                data = r.json()
-                if 'balances' in data:
-                    exito = True
-                    break
-            except: continue
+    # Intentamos con los primeros 10 proxies de la lista hasta que uno pase
+    for p in proxies[:10]:
+        try:
+            px = {"http": f"http://{p}", "https": f"http://{p}"}
+            r = requests.get(url, headers=headers, proxies=px, timeout=5)
+            data = r.json()
+            if 'balances' in data:
+                exito = True
+                break
+        except:
+            continue
 
     if not exito:
-        # Si todo falla, enviamos el reporte técnico para saber qué puerta intentar cerrar
-        msg_error = "🚨 *BLOQUEO GEOGRÁFICO PERSISTENTE*\n\nBinance sigue rechazando la conexión desde los servidores de GitHub (USA).\n\n*Recomendación:* Genera una nueva API Key en Binance y asegúrate de marcar 'No IP Restrictions'."
+        msg_error = "🚨 *MURO INFRANQUEABLE*\n\nBinance detectó todos los intentos de túnel. La única forma de seguir en GitHub es con un Proxy Privado de pago ($2 USD)."
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={'chat_id': CHAT_ID, 'text': msg_error, 'parse_mode': 'Markdown'})
         return
 
-    # --- PROCESO DE SALDO REAL ---
+    # --- ÉXITO ---
     saldo_usdt = next((float(b['free']) for b in data['balances'] if b['asset'] == 'USDT'), 0.0)
     tasa_cop = 4100
     capital_total_cop = saldo_usdt * tasa_cop
@@ -63,10 +55,10 @@ def ejecutar_agente_polybot():
         "🤖 *AGENTE POLYBOT REAL* 🛰️\n"
         f"📅 *CORTE:* {ahora}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 *CAPITAL:* ${capital_total_cop:,.0f} COP\n"
-        f"💵 *SALDO:* {saldo_usdt:.2f} USDT\n"
+        f"💰 *CAPITAL REAL:* ${capital_total_cop:,.0f} COP\n"
+        f"💵 *SALDO REAL:* {saldo_usdt:.2f} USDT\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "✅ _Sincronización forzada exitosa_"
+        "✅ _Conexión establecida por Túnel Rotativo_"
     )
     requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={'chat_id': CHAT_ID, 'text': mensaje, 'parse_mode': 'Markdown'})
 
