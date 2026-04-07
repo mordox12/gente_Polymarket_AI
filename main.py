@@ -13,43 +13,44 @@ def ejecutar_agente_polybot():
     query = f"timestamp={ts}"
     signature = hmac.new(SECRET_KEY.encode('utf-8'), query.encode('utf-8'), hashlib.sha256).hexdigest()
     
-    # URL de Binance
     url = f"https://api.binance.com/api/v3/account?{query}&signature={signature}"
     headers = {"X-MBX-APIKEY": API_KEY}
 
-    # --- LISTA DE PROXIES PARA SALTAR EL BLOQUEO GEOGRÁFICO ---
-    # Intentamos conectar a través de servidores en otros países
-    proxies_lista = [
-        None, # Intento normal primero
-        {'http': 'http://167.71.200.170:8080', 'https': 'http://167.71.200.170:8080'}, # Proxy ejemplo
-        {'http': 'http://188.166.162.24:3128', 'https': 'http://188.166.162.24:3128'}
-    ]
-
+    # Intentamos conectar (Binance suele bloquear GitHub, por eso probamos varios caminos)
     data = None
     exito = False
+    
+    try:
+        # Intento directo
+        response = requests.get(url, headers=headers, timeout=10)
+        data = response.json()
+        if 'balances' in data:
+            exito = True
+    except:
+        pass
 
-    for proxy in proxies_lista:
+    if not exito:
+        # Si falla el directo, intentamos con api3 que a veces salta el bloqueo
         try:
-            print(f"Intentando conectar con proxy: {proxy}")
-            response = requests.get(url, headers=headers, proxies=proxy, timeout=10)
+            url_alt = f"https://api3.binance.com/api/v3/account?{query}&signature={signature}"
+            response = requests.get(url_alt, headers=headers, timeout=10)
             data = response.json()
             if 'balances' in data:
                 exito = True
-                break
         except:
-            continue
+            pass
 
     if not exito:
-        error_msg = data.get('msg', 'Binance sigue bloqueando la IP de la nube.') if data else "Error de Timeout"
+        error_msg = data.get('msg', 'Bloqueo regional de Binance') if data else "Error de Red"
         msg_error = (
-            "🚨 *BLOQUEO REGIONAL TOTAL*\n\n"
-            "Mano, Binance bloqueó todas las entradas de GitHub.\n"
-            "Detalle: `Service Unavailable / Restricted Location`"
+            "🚨 *BLOQUEO DE BINANCE*\n\n"
+            "Mano, Binance detectó que el bot está en EE.UU. (GitHub) y lo bloqueó.\n"
+            f"Detalle: `{error_msg}`"
         )
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={'chat_id': CHAT_ID, 'text': msg_error, 'parse_mode': 'Markdown'})
         return
 
-    # --- PROCESO EXITOSO ---
+    # --- TODO SALIÓ BIEN ---
     saldo_usdt = next((float(b['free']) for b in data['balances'] if b['asset'] == 'USDT'), 0.0)
     tasa_cop = 4100
     capital_total_cop = saldo_usdt * tasa_cop
@@ -60,4 +61,12 @@ def ejecutar_agente_polybot():
         f"📅 *CORTE:* {ahora}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 *CAPITAL REAL:* ${capital_total_cop:,.0f} COP\n"
-        f"💵 *SALDO REAL:* {saldo_usdt:.2f} USDT\
+        f"💵 *SALDO REAL:* {saldo_usdt:.2f} USDT\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "✅ _Sincronizado con Éxito_"
+    )
+    
+    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={'chat_id': CHAT_ID, 'text': mensaje, 'parse_mode': 'Markdown'})
+
+if __name__ == "__main__":
+    ejecutar_agente_polybot()
