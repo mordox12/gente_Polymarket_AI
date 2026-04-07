@@ -7,57 +7,57 @@ API_KEY = os.getenv('BINANCE_API_KEY')
 SECRET_KEY = os.getenv('BINANCE_SECRET_KEY')
 
 def ejecutar_agente_polybot():
-    if not API_KEY or not SECRET_KEY:
-        print("❌ Error: Llaves API no encontradas.")
-        return
+    if not API_KEY or not SECRET_KEY: return
 
     ts = int(time.time() * 1000)
     query = f"timestamp={ts}"
     signature = hmac.new(SECRET_KEY.encode('utf-8'), query.encode('utf-8'), hashlib.sha256).hexdigest()
     
-    # PROBANDO CON EL SERVIDOR ADICIONAL (api1, api2 o api3 suelen saltar el bloqueo de región)
-    url = f"https://api1.binance.com/api/v3/account?{query}&signature={signature}"
+    # URL de Binance
+    url = f"https://api.binance.com/api/v3/account?{query}&signature={signature}"
     headers = {"X-MBX-APIKEY": API_KEY}
-    
-    try:
-        response = requests.get(url, headers=headers)
-        data = response.json()
-        
-        if 'balances' not in data:
-            # Si api1 falla, intentamos con api3 que es más robusta
-            url_alt = f"https://api3.binance.com/api/v3/account?{query}&signature={signature}"
-            data = requests.get(url_alt, headers=headers).json()
 
-        if 'balances' not in data:
-            error_msg = data.get('msg', 'Restricción regional de Binance')
-            msg_error = f"🚨 *ERROR GEOGRÁFICO BINANCE*\n\nDetalle: `Binance bloqueó la IP de GitHub`\nSugerencia: `Usa api3.binance.com` o verifica tu ubicación."
-            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                          json={'chat_id': CHAT_ID, 'text': msg_error, 'parse_mode': 'Markdown'})
-            return
+    # --- LISTA DE PROXIES PARA SALTAR EL BLOQUEO GEOGRÁFICO ---
+    # Intentamos conectar a través de servidores en otros países
+    proxies_lista = [
+        None, # Intento normal primero
+        {'http': 'http://167.71.200.170:8080', 'https': 'http://167.71.200.170:8080'}, # Proxy ejemplo
+        {'http': 'http://188.166.162.24:3128', 'https': 'http://188.166.162.24:3128'}
+    ]
 
-        saldo_usdt = next((float(b['free']) for b in data['balances'] if b['asset'] == 'USDT'), 0.0)
-        tasa_cop = 4100
-        capital_total_cop = saldo_usdt * tasa_cop
-        
-        activos = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
-        activo_elegido = random.choice(activos)
-        ahora = datetime.now().strftime("%d/%m/%Y %I:%M %p")
+    data = None
+    exito = False
 
-        mensaje = (
-            "🤖 *AGENTE POLY MARKET BOT* 🛰️\n"
-            f"📅 *CORTE:* {ahora}\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"💰 *CAPITAL REAL:* ${capital_total_cop:,.0f} COP\n"
-            f"💵 *SALDO REAL:* {saldo_usdt:.2f} USDT\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "✅ _Conexión Exitosa vía API Alternativa_"
+    for proxy in proxies_lista:
+        try:
+            print(f"Intentando conectar con proxy: {proxy}")
+            response = requests.get(url, headers=headers, proxies=proxy, timeout=10)
+            data = response.json()
+            if 'balances' in data:
+                exito = True
+                break
+        except:
+            continue
+
+    if not exito:
+        error_msg = data.get('msg', 'Binance sigue bloqueando la IP de la nube.') if data else "Error de Timeout"
+        msg_error = (
+            "🚨 *BLOQUEO REGIONAL TOTAL*\n\n"
+            "Mano, Binance bloqueó todas las entradas de GitHub.\n"
+            "Detalle: `Service Unavailable / Restricted Location`"
         )
-        
-        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                      json={'chat_id': CHAT_ID, 'text': mensaje, 'parse_mode': 'Markdown'})
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={'chat_id': CHAT_ID, 'text': msg_error, 'parse_mode': 'Markdown'})
+        return
 
-    except Exception as e:
-        print(f"Error: {e}")
+    # --- PROCESO EXITOSO ---
+    saldo_usdt = next((float(b['free']) for b in data['balances'] if b['asset'] == 'USDT'), 0.0)
+    tasa_cop = 4100
+    capital_total_cop = saldo_usdt * tasa_cop
+    ahora = datetime.now().strftime("%d/%m/%Y %I:%M %p")
 
-if __name__ == "__main__":
-    ejecutar_agente_polybot()
+    mensaje = (
+        "🤖 *AGENTE POLYBOT REAL* 🛰️\n"
+        f"📅 *CORTE:* {ahora}\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 *CAPITAL REAL:* ${capital_total_cop:,.0f} COP\n"
+        f"💵 *SALDO REAL:* {saldo_usdt:.2f} USDT\
